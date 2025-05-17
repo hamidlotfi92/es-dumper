@@ -63,32 +63,69 @@ pub fn run_backup(
     let start_time = std::time::Instant::now();
 
     let completed_indices = Arc::new(Mutex::new(0));
+    let active_indices = Arc::new(Mutex::new(0));
 
-    indices.par_chunks(config.max_parallel_indices).for_each(|chunk| {
-        for index in chunk {
-            let pb_index = multi.add(ProgressBar::new(0));
-            pb_index.set_style(
-                ProgressStyle::default_bar()
-                    .template(
-                        "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}"
+    // Configure Rayon thread pool to limit concurrency
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(config.max_parallel_indices).build()?;
+
+    pool.install(|| {
+        indices.par_chunks(config.max_parallel_indices).for_each(|chunk| {
+            for index in chunk {
+                let mut active = active_indices.lock().unwrap();
+                *active += 1;
+                if
+                    let Err(e) = log(
+                        log_file,
+                        &format!(
+                            "Starting backup for index: {} (active indices: {})",
+                            index,
+                            *active
+                        )
                     )
-                    .unwrap()
-                    .progress_chars("#>-")
-            );
-            pb_index.set_message(index.to_string());
+                {
+                    eprintln!("Failed to log for index {}: {}", index, e);
+                }
+                drop(active);
 
-            let result = backup_index(config, index, log_file, &pb_index);
-            if let Err(e) = result {
-                let _ = log(log_file, &format!("Error backing up index {}: {}", index, e));
-                pb_index.abandon_with_message(format!("Error: {}", e));
-            } else {
-                pb_index.finish_and_clear();
+                let pb_index = multi.add(ProgressBar::new(0));
+                pb_index.set_style(
+                    ProgressStyle::default_bar()
+                        .template(
+                            "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}"
+                        )
+                        .unwrap()
+                        .progress_chars("#>-")
+                );
+                pb_index.set_message(index.to_string());
+
+                let result = backup_index(config, index, log_file, &pb_index, &es_version);
+                if let Err(e) = result {
+                    let _ = log(log_file, &format!("Error backing up index {}: {}", index, e));
+                    pb_index.abandon_with_message(format!("Error: {}", e));
+                } else {
+                    pb_index.finish_and_clear();
+                }
+
+                let mut active = active_indices.lock().unwrap();
+                *active -= 1;
+                if
+                    let Err(e) = log(
+                        log_file,
+                        &format!(
+                            "Completed backup for index: {} (active indices: {})",
+                            index,
+                            *active
+                        )
+                    )
+                {
+                    eprintln!("Failed to log for index {}: {}", index, e);
+                }
+
+                let mut completed = completed_indices.lock().unwrap();
+                *completed += 1;
+                pb_main.set_position(*completed);
             }
-
-            let mut completed = completed_indices.lock().unwrap();
-            *completed += 1;
-            pb_main.set_position(*completed);
-        }
+        });
     });
 
     let duration = start_time.elapsed();
@@ -105,16 +142,16 @@ fn backup_index(
     config: &BackupConfig,
     index: &str,
     log_file: &Arc<Mutex<File>>,
-    pb_index: &ProgressBar
+    pb_index: &ProgressBar,
+    es_version: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
-    log(log_file, &format!("Starting backup for index: {}", index))?;
+    log(log_file, &format!("Processing index: {}", index))?;
 
     let index_dir = Path::new(&config.backup_dir).join(index);
     fs::create_dir_all(&index_dir)?;
 
     backup_mapping(config, index, &index_dir, log_file)?;
-    backup_data(config, index, &index_dir, log_file, pb_index)?;
-
+    backup_data(config, index, &index_dir, log_file, pb_index, es_version)?;
     log(log_file, &format!("Backup completed for index: {}", index))?;
     Ok(())
 }
@@ -124,7 +161,8 @@ fn backup_data(
     index: &str,
     index_dir: &Path,
     log_file: &Arc<Mutex<File>>,
-    pb_index: &ProgressBar
+    pb_index: &ProgressBar,
+    es_version: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = build_http_client(config)?;
 
@@ -142,18 +180,34 @@ fn backup_data(
 
     pb_index.set_length(doc_count);
 
+    // Adjust scroll_size for Elasticsearch 8.3.3
+    let effective_scroll_size = if es_version.starts_with("8.3") {
+        (config.scroll_size / 2).max(1000) // Reduce to 5000, minimum 1000
+    } else {
+        config.scroll_size
+    };
+
     let scroll_url = format!("{}/{}/_search?scroll={}", config.host, index, config.scroll_time);
 
     let scroll_body =
         serde_json::json!({
-        "size": config.scroll_size,
+        "size": effective_scroll_size,
         "query": { "match_all": {} },
         "_source": true,
         "sort": ["_doc"]
     });
 
-    log(log_file, &format!("Starting data export for index: {} ({} documents)", index, doc_count))?;
+    log(
+        log_file,
+        &format!(
+            "Starting data export for index: {} ({} documents, scroll_size: {})",
+            index,
+            doc_count,
+            effective_scroll_size
+        )
+    )?;
 
+    let start_time = std::time::Instant::now();
     let response = client.post(&scroll_url).json(&scroll_body).send()?;
 
     if !response.status().is_success() {
@@ -246,9 +300,15 @@ fn backup_data(
         .json(&serde_json::json!({"scroll_id": [scroll_id]}))
         .send();
 
+    let duration = start_time.elapsed();
     log(
         log_file,
-        &format!("Completed data export for index: {}. Total documents: {}", index, total_docs)
+        &format!(
+            "Completed data export for index: {}. Total documents: {}. Duration: {:.2} seconds",
+            index,
+            total_docs,
+            duration.as_secs_f64()
+        )
     )?;
 
     #[cfg(feature = "compression")]
@@ -306,18 +366,15 @@ fn fetch_indices(
             format!("Failed to parse _cat/indices response: {}. Raw response: {}", e, response_text)
         })?;
 
-    // Handle error responses
     if let Some(error) = json.get("error") {
         let reason = error["reason"].as_str().unwrap_or("Unknown error");
         let error_type = error["type"].as_str().unwrap_or("Unknown type");
         return Err(format!("Elasticsearch error (type: {}): {}", error_type, reason).into());
     }
 
-    // Handle version-specific response formats
     let indices_array = if json.is_array() {
         json.as_array().ok_or_else(|| format!("Expected array of indices, got: {}", json))?
     } else if json.is_object() && es_version.starts_with("8.3") {
-        // In 8.3.3, try to extract indices from a map or handle empty response
         log(
             log_file,
             "Received map response from _cat/indices, attempting to handle for ES 8.3.x"
@@ -328,11 +385,9 @@ fn fetch_indices(
                 .map(|o| o.is_empty())
                 .unwrap_or(false)
         {
-            // Empty response, return empty array
             log(log_file, "No indices found in map response")?;
             return Ok(vec![]);
         }
-        // Attempt to find an "indices" field or similar
         json
             .get("indices")
             .and_then(|v| v.as_array())
