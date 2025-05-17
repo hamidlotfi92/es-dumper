@@ -9,7 +9,7 @@ use std::env;
 use std::fs::File;
 use std::path::Path;
 use std::sync::{ Arc, Mutex };
-use utils::{ setup_backup_dir };
+use utils::{ log, setup_backup_dir };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();

@@ -1,14 +1,15 @@
-use crate::config::{ BackupConfig };
+use crate::config::{ BackupConfig, DEFAULT_LOG_FILE };
 use crate::http_client::build_http_client;
 use crate::utils::{ log, reduce_document_size, compress_file };
 use indicatif::{ MultiProgress, ProgressBar, ProgressStyle };
 use rayon::prelude::*;
-
+use reqwest::blocking::Client;
 use serde_json::Value;
 use std::fs::{ self, File };
 use std::io::{ BufWriter, Write };
 use std::path::Path;
 use std::sync::{ Arc, Mutex };
+use std::time::Duration;
 
 pub fn run_backup(
     config: &BackupConfig,

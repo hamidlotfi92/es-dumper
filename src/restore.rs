@@ -1,4 +1,4 @@
-use crate::config::{ BackupConfig };
+use crate::config::{ BackupConfig, DEFAULT_LOG_FILE };
 use crate::http_client::build_http_client;
 use crate::utils::log;
 use indicatif::{ MultiProgress, ProgressBar, ProgressStyle };
@@ -6,10 +6,11 @@ use rayon::prelude::*;
 use reqwest::header;
 use serde_json::Value;
 use std::fs::{ self, File };
-use std::io::{ BufReader };
+use std::io::{ BufReader, Read };
 use std::path::Path;
 use std::process::Command;
 use std::sync::{ Arc, Mutex };
+use std::time::Duration;
 
 pub fn run_restore(
     config: &BackupConfig,
