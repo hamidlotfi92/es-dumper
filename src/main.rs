@@ -26,7 +26,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => Operation::Backup { index: None },
     };
 
-    // Load config from file
     let config_file = config::load_config()?;
 
     let backup_dir = config_file.backup.backup_dir.unwrap_or(

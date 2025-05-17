@@ -8,7 +8,6 @@ pub fn build_http_client(config: &BackupConfig) -> Result<Client, Box<dyn std::e
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
-    // Add Basic Authentication header if credentials are provided
     if let Some((username, password)) = &config.auth {
         let auth = encode(format!("{}:{}", username, password));
         let auth_header = HeaderValue::from_str(&format!("Basic {}", auth))?;

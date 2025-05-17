@@ -1,6 +1,6 @@
 use crate::config::{ BackupConfig, DEFAULT_LOG_FILE };
 use crate::http_client::build_http_client;
-use crate::utils::{ log, reduce_document_size, compress_file };
+use crate::utils::{ log, reduce_document_size, compress_file, get_elasticsearch_version };
 use indicatif::{ MultiProgress, ProgressBar, ProgressStyle };
 use rayon::prelude::*;
 use reqwest::blocking::Client;
@@ -18,9 +18,12 @@ pub fn run_backup(
 ) -> Result<(), Box<dyn std::error::Error>> {
     log(log_file, "Starting Elasticsearch backup process")?;
 
+    let client = build_http_client(config)?;
+    let es_version = get_elasticsearch_version(&client, &config.host, log_file)?;
+    log(log_file, &format!("Detected Elasticsearch version: {}", es_version))?;
+
     let indices = match specific_index {
         Some(index) => {
-            let client = build_http_client(config)?;
             let url = format!("{}/{}/_count", config.host, index);
             let response = client.get(&url).send()?;
             if !response.status().is_success() {
@@ -32,7 +35,7 @@ pub fn run_backup(
             }
             vec![index.to_string()]
         }
-        None => fetch_indices(config)?,
+        None => fetch_indices(config, log_file, &es_version)?,
     };
 
     if indices.is_empty() {
@@ -249,7 +252,10 @@ fn backup_data(
     )?;
 
     #[cfg(feature = "compression")]
-    compress_file(&data_file)?;
+    {
+        log(log_file, &format!("Compressing data file for index: {}", index))?;
+        compress_file(&data_file)?;
+    }
 
     Ok(())
 }
@@ -273,14 +279,74 @@ fn backup_mapping(
     Ok(())
 }
 
-fn fetch_indices(config: &BackupConfig) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn fetch_indices(
+    config: &BackupConfig,
+    log_file: &Arc<Mutex<File>>,
+    es_version: &str
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let client = build_http_client(config)?;
-    let cat_indices_url = format!("{}/_cat/indices?format=json", config.host);
+    let cat_indices_url = format!("{}/_cat/indices?format=json&v=true", config.host);
     let response = client.get(&cat_indices_url).send()?;
-    let indices: Vec<Value> = response.json()?;
 
-    let mut result = indices
-        .into_iter()
+    let status = response.status();
+    let response_text = response.text()?;
+    log(
+        log_file,
+        &format!(
+            "Response from _cat/indices (status: {}, version: {}): {}",
+            status,
+            es_version,
+            response_text
+        )
+    )?;
+
+    let json: Value = serde_json
+        ::from_str(&response_text)
+        .map_err(|e| {
+            format!("Failed to parse _cat/indices response: {}. Raw response: {}", e, response_text)
+        })?;
+
+    // Handle error responses
+    if let Some(error) = json.get("error") {
+        let reason = error["reason"].as_str().unwrap_or("Unknown error");
+        let error_type = error["type"].as_str().unwrap_or("Unknown type");
+        return Err(format!("Elasticsearch error (type: {}): {}", error_type, reason).into());
+    }
+
+    // Handle version-specific response formats
+    let indices_array = if json.is_array() {
+        json.as_array().ok_or_else(|| format!("Expected array of indices, got: {}", json))?
+    } else if json.is_object() && es_version.starts_with("8.3") {
+        // In 8.3.3, try to extract indices from a map or handle empty response
+        log(
+            log_file,
+            "Received map response from _cat/indices, attempting to handle for ES 8.3.x"
+        )?;
+        if
+            json
+                .as_object()
+                .map(|o| o.is_empty())
+                .unwrap_or(false)
+        {
+            // Empty response, return empty array
+            log(log_file, "No indices found in map response")?;
+            return Ok(vec![]);
+        }
+        // Attempt to find an "indices" field or similar
+        json
+            .get("indices")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| {
+                format!("Expected 'indices' array in map response for ES 8.3.x, got: {}", json)
+            })?
+    } else {
+        return Err(
+            format!("Unexpected response format for ES version {}: {}", es_version, json).into()
+        );
+    };
+
+    let mut result = indices_array
+        .iter()
         .filter_map(|index| {
             let index_name = index["index"].as_str()?;
             if index_name.starts_with('.') || config.skip_indices.contains(&index_name.to_string()) {

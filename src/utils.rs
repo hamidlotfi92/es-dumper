@@ -1,3 +1,4 @@
+use crate::config::DEFAULT_LOG_FILE;
 use chrono::Local;
 use serde_json::Value;
 use std::fs::{ self, File };
@@ -5,6 +6,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{ Arc, Mutex };
+use reqwest::blocking::Client;
 
 pub fn setup_backup_dir(backup_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(backup_dir)?;
@@ -33,9 +35,33 @@ pub fn reduce_document_size(doc: &Value) -> Result<Value, Box<dyn std::error::Er
 #[cfg(feature = "compression")]
 pub fn compress_file(file_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let status = Command::new("gzip").arg("-k").arg(file_path).status()?;
-
     if !status.success() {
         return Err("Failed to compress file".into());
     }
     Ok(())
+}
+
+pub fn get_elasticsearch_version(
+    client: &Client,
+    host: &str,
+    log_file: &Arc<Mutex<File>>
+) -> Result<String, Box<dyn std::error::Error>> {
+    let url = format!("{}/", host);
+    let response = client.get(&url).send()?;
+    let status = response.status();
+    let response_text = response.text()?;
+
+    log(log_file, &format!("Response from version check (status: {}): {}", status, response_text))?;
+
+    if !status.is_success() {
+        return Err(format!("Failed to fetch version: {}", status).into());
+    }
+
+    let json: Value = serde_json::from_str(&response_text)?;
+    let version = json["version"]["number"]
+        .as_str()
+        .ok_or("No version number found in response")?
+        .to_string();
+
+    Ok(version)
 }
