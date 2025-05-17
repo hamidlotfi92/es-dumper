@@ -1,0 +1,17 @@
+[elastic]
+host = "http://es.example.com:9200"
+username = "es_user"
+password = "securepass123"
+timeout_secs = 180
+connect_timeout_secs = 60
+
+[backup]
+backup_dir = "./backups"
+scroll_size = 10000
+max_parallel_indices = 4
+scroll_time = "10m"
+skip_indices = ["books"]
+
+
+[restore]
+bulk_batch_size = 5000
