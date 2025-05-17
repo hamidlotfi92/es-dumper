@@ -1,6 +1,6 @@
 use crate::config::{ BackupConfig };
 use crate::http_client::build_http_client;
-use crate::utils::{ log, reduce_document_size };
+use crate::utils::{ log, reduce_document_size, compress_file };
 use indicatif::{ MultiProgress, ProgressBar, ProgressStyle };
 use rayon::prelude::*;
 
