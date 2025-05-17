@@ -1,0 +1,110 @@
+{
+  "netmiko-2025-03": {
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "bgp_index": {
+          "type": "long"
+        },
+        "block_ip": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "block_name": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "block_number": {
+          "type": "long"
+        },
+        "cidr": {
+          "type": "long"
+        },
+        "disable": {
+          "type": "boolean"
+        },
+        "endedAt": {
+          "type": "date"
+        },
+        "last_rollback": {
+          "type": "long"
+        },
+        "last_seen": {
+          "type": "long"
+        },
+        "last_seen_mitigator": {
+          "type": "long"
+        },
+        "last_tagged": {
+          "type": "long"
+        },
+        "main_range": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "manually": {
+          "type": "boolean"
+        },
+        "permanent": {
+          "type": "boolean"
+        },
+        "place": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "range": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "redirect_index": {
+          "type": "long"
+        },
+        "reduce_commands": {
+          "type": "boolean"
+        },
+        "special": {
+          "type": "boolean"
+        },
+        "state": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "sum_doc_count": {
+          "type": "long"
+        }
+      }
+    }
+  }
+}

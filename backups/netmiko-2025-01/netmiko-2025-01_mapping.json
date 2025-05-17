@@ -1,0 +1,86 @@
+{
+  "netmiko-2025-01": {
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "bgp_index": {
+          "type": "long"
+        },
+        "block_ip": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "block_name": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "block_number": {
+          "type": "long"
+        },
+        "disable": {
+          "type": "boolean"
+        },
+        "keep_alive_until": {
+          "type": "long"
+        },
+        "last_rollback": {
+          "type": "long"
+        },
+        "last_seen": {
+          "type": "long"
+        },
+        "last_seen_mitigator": {
+          "type": "long"
+        },
+        "last_tagged": {
+          "type": "long"
+        },
+        "permanent": {
+          "type": "boolean"
+        },
+        "place": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "range": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        },
+        "redirect_index": {
+          "type": "long"
+        },
+        "state": {
+          "fields": {
+            "keyword": {
+              "ignore_above": 256,
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "classic_movies": {
+    "mappings": {
+      "properties": {
+        "director": {
+          "type": "keyword"
+        },
+        "title": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}

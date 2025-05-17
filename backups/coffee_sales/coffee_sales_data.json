@@ -1,0 +1,1 @@
+[{"_id":"1","_source":{"date":"2022-09-01","price":{"americano":2.1,"cappuccino":2.5,"latte":2.4,"tea":1.5},"sales":{"americano":9,"cappuccino":23,"latte":12,"tea":7}},"sort":[0]},{"_id":"2","_source":{"date":"2022-09-02","price":{"americano":2.1,"cappuccino":2.5,"latte":2.4,"tea":1.5},"sales":{"americano":19,"cappuccino":40,"latte":16,"tea":15}},"sort":[1]}]

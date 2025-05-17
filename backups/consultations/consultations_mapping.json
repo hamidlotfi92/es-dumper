@@ -1,0 +1,14 @@
+{
+  "consultations": {
+    "mappings": {
+      "properties": {
+        "doctor_notes": {
+          "type": "flattened"
+        },
+        "patient_name": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}

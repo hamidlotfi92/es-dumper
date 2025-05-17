@@ -1,0 +1,38 @@
+{
+  "movies": {
+    "mappings": {
+      "properties": {
+        "actors": {
+          "type": "text"
+        },
+        "certificate": {
+          "type": "keyword"
+        },
+        "director": {
+          "type": "text"
+        },
+        "genre": {
+          "type": "text"
+        },
+        "rating": {
+          "type": "half_float"
+        },
+        "release_date": {
+          "format": "dd-MM-yyyy",
+          "type": "date"
+        },
+        "synopsis": {
+          "type": "text"
+        },
+        "title": {
+          "fields": {
+            "original": {
+              "type": "keyword"
+            }
+          },
+          "type": "text"
+        }
+      }
+    }
+  }
+}

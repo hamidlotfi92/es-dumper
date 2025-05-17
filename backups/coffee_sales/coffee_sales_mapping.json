@@ -1,0 +1,43 @@
+{
+  "coffee_sales": {
+    "mappings": {
+      "properties": {
+        "date": {
+          "type": "date"
+        },
+        "price": {
+          "properties": {
+            "americano": {
+              "type": "float"
+            },
+            "cappuccino": {
+              "type": "float"
+            },
+            "latte": {
+              "type": "float"
+            },
+            "tea": {
+              "type": "float"
+            }
+          }
+        },
+        "sales": {
+          "properties": {
+            "americano": {
+              "type": "long"
+            },
+            "cappuccino": {
+              "type": "long"
+            },
+            "latte": {
+              "type": "long"
+            },
+            "tea": {
+              "type": "long"
+            }
+          }
+        }
+      }
+    }
+  }
+}
